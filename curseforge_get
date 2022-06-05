@@ -1,0 +1,68 @@
+#!/bin/sh
+####################
+##  ____  _     ####
+## | __ )(_) ___####
+## |  _ \| |/ _ \###
+## | |_) | | (_) |##
+## |____/|_|\___/###
+#####################################################
+### This program takes manifest.json file          ##
+### and download every entry in it from curseforge ##
+#####################################################
+# deps: jq , wget , gnucore #Imp: this script ment to work with curseforge_format script as $FORMATTER
+# files will be saved in $MODDIR seperatly for each modpack, note that if you run it for the same modpack twice it will override everything.
+# feel free to clear the cache
+
+###VARS###
+MANIFEST="$1" # the modpack manifest inside of a pack zip list all the mods project and file IDs to download
+outputModDir="$2" # directory where to export the downloaded mods to, good for automation 
+#[ -z "$var" ] && MANIFEST=$HOME/manifest.json #a default for testing
+NAME=$(cat "$MANIFEST" | jq -r '.name')
+# Where to store failed mods log for debug
+LOGFAILED=$HOME/.cache/.curseforgePackager/.downloader/$NAME/log.log
+# Where to store cache addresses recieved from API
+LOGTEMP=$HOME/.cache/.curseforgePackager/.downloader/$NAME/cf-output.log
+# Where to store downloaded mods temporary
+MODDIR=$HOME/.cache/.curseforgePackager/.downloader/$NAME/mods
+# Length of entries in manifest
+LENG=$(cat "$MANIFEST" | jq -r '.files | length')
+#cat "$MANIFEST" | jq -r '.files|.[0]|.projectID,.fileID'
+
+###BINS###
+# Formatter is a script that takes pID and fID and gives link via curseproxy API
+FORMATTER=./curseforge_format
+
+###INIT###
+mkdir -p $MODDIR
+touch $LOGFAILED
+touch $LOGTEMP
+#CLEAN
+echo -n "" > $LOGTEMP
+echo -n "" > $LOGFAILED
+echo "clearing cache mods..."
+rm -rf $MODDIR/*.jar
+
+###MAIN###
+echo $LENG "mods to download..."
+for ((c=0; c < $LENG; c++));do
+	fails=0
+	pi=$(cat "$MANIFEST" | jq -r '.files|.['$c']|.projectID')
+	fi=$(cat "$MANIFEST" | jq -r '.files|.['$c']|.fileID')
+#	cat "$MANIFEST" | jq -r '.files|.[0]|.projectID,.fileID'
+	$FORMATTER -p $pi -f $fi >> $LOGTEMP
+    modToDown=$(tail -1 $LOGTEMP)
+    echo -e "\033[0;34m DOWNLOADING: \033[0m" $modToDown
+    wget -P $MODDIR $modToDown 
+    if [ $? = "0" ]; then
+               echo -e "\033[0;32m OK \033[0m"
+       else
+               ((fails+=1))
+               echo $modToDown >> $LOGFAILED
+               echo -e "\033[0;31m FAILED '\033[0;31m' \n COULD NOT DOWNLOAD MOD WITH projectID $pi and fileID $fi '\033[0m'"
+    fi
+done
+	LENG_DONE=$(ls $MODDIR | wc -l)
+	echo "downloaded" $LENG_DONE "out of" $LENG "mods"
+    echo "check the log file at $LOGFAILED and download $fails mod manualy if any... Good Luck!"
+	echo "mods saved at $MODDIR"
+    [ ! -z "$outputModDir" ] && cp -r "$MODDIR/." "$outputModDir" && rm -rf "$MODDIR"

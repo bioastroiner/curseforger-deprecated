@@ -1,0 +1,17 @@
+#!/bin/sh
+####################
+##  ____  _     ####
+## | __ )(_) ___####
+## |  _ \| |/ _ \###
+## | |_) | | (_) |##
+## |____/|_|\___/###
+####################
+# this small script dose one thing, give it cures project and file ID (in that order) and it will spit out a link which you can download the mod from directly. 
+# for more info about the API: https://github.com/NikkyAI/CurseProxy
+# NOTE: this dosen't use jq ig that would make the code shorter, but that's fine i see which one's faster in an other time, for now this code purely uses gnucore utils
+# note that files may not format correctly, i am doing it in a dirty way, but it works for almost any mod so far.
+PID=$1
+FID=$2
+
+API="https://curse.nikky.moe/api/addon/$PID/file/$FID"
+curl -s $API | sed -e 's/[{}]/''/g' | awk -v k="text" '{n=split($0,a,","); for (i=1; i<=n; i++) print a[i]}' | grep -o https://edge.forgecdn.net/files/.*\.jar | sed 's\ \%20\g' | sed 's/\+/%2B/g' | sed 's\edge\media\g'
