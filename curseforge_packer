@@ -8,15 +8,16 @@
 ####################
 # pack getter
 # downloads packs and outputs a manifest.json which can be piped into curseforge_get
+
 # for now it willl pull only the latest version
 PID=$1
 FID=$2 #Buggy don't use
-# Your Multimc instance folder
-INSTANCES=$HOME/.local/share/multimc/instances
-# non presistance directory to store our downloaded packaged modpack, all of it will be wiped out and transformed into your Multimc directory, if that dosen't exist change $INSTANCES to one that matches like Polymc or smth.
+INSTANCES=$HOME/.local/share/PolyMC/instances
 cacheDir=$HOME/.cache/.curseforgePackager/.packer
+
 mkdir -p $cacheDir
-cachedJson=$cacheDir/api-$PID.json
+
+cachedJson=/tmp/api-$PID.json
 API="https://curse.nikky.moe/api/addon/$PID"
 curl $API -o $cachedJson
 # below can be piped into "xargs wget" and download the modpack, last here stands for latest version
@@ -24,13 +25,22 @@ curl $API -o $cachedJson
 [ -z "$FID" ] || PACKURL=$(cat $cachedJson | jq -r '.downloadUrl' | sed 's\ \%20\g' | sed 's/\+/%2B/g')
 [ -z "$FID" ] && NAME=$(cat $cachedJson | jq -r '.latestFiles | last | .fileName' | sed 's/\.zip//g')
 [ -z "$FID" ] || NAME=$(cat $cachedJson | jq -r '.fileName' | sed '/.zip/d')
-cachedPackDir="$cacheDir/$NAME"
-mkdir -p "$cachedPackDir"
-wget -O- $PACKURL | bsdtar -xvf - -C "$cachedPackDir"
-mkdir -p "$cachedPackDir/.minecraft/mods"
-mkdir -p "$cachedPackDir/.minecraft"
-cp -rf "$cachedPackDir/overrides/." "$cachedPackDir/.minecraft" #&& rm -rf "$cachedPackDir/overrides" # yea i could just mv it and change the name, i think this wat is safer in my mind
-sh ./curseforge_get "$cachedPackDir/manifest.json" "$cachedPackDir/.minecraft/mods"
-echo "copying $cachedPackDir into $INSTANCES/$NAME"
+PACK="$cacheDir/$NAME-modpack"
+mkdir -p "$PACK"
+mkdir -p "$PACK/.minecraft"
+mkdir -p "$PACK/.minecraft/mods"
 #mkdir -p "$INSTANCES/$NAME"
-#cp -rf "$cachedPackDir" "$INSTANCES/$NAME" #&& echo "Deleting cache..." && rm -rf $cacheDir
+
+# Download modpack zip
+wget -O- $PACKURL | bsdtar -xvf - -C "$PACK"
+
+sh ./curseforge_get "$PACK/manifest.json" "$PACK/.minecraft/mods"
+
+echo ". . . $PACK/overrides => $PACK/.minecraft"
+cp -rf "$PACK/overrides/." "$PACK/.minecraft" #&& rm -rf "$PACK/overrides" # yea i could just mv it and change the name, i think this way is easier to debug
+
+echo $(ls -A $PACK/.minecraft/mods | wc -l)
+#echo "copying $PACK into $INSTANCES/$NAME" 
+#cp -rf "$PACK" "$INSTANCES/$NAME" #&& echo "Deleting cache..." && rm -rf $cacheDir
+
+
